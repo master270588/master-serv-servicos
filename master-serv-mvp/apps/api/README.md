@@ -1,12 +1,21 @@
-# API — início
+# MASTER SERV SERVIÇOS — API inicial
 
-Este diretório reserva o espaço da API NestJS.
+Esta é a primeira base executável da API, construída com NestJS.
 
-Para gerar o projeto NestJS aqui, a partir da raiz:
-```bash
-npx @nestjs/cli new apps/api --package-manager npm
-```
+## Requisitos
+- Node.js 20 ou superior
+- npm
 
-Depois, configure validação de entrada, autenticação, autorização por papel,
-tratamento centralizado de erros, logs estruturados e testes automatizados.
-Não exponha endpoints administrativos sem autorização verificada no servidor.
+## Instalação local
+1. Copie `.env.example` para `.env`.
+2. No terminal, dentro desta pasta, execute `npm install`.
+3. Execute `npm run start:dev`.
+4. Abra `http://localhost:3000/api/health`.
+
+A resposta esperada é um JSON com `status: "ok"`.
+
+## Rotas desta etapa
+- `GET /api/health` — verifica se a API está ativa.
+
+## Situação e próximos passos
+Esta etapa ainda não conecta ao PostgreSQL e não contém login, cadastro, documentos, pagamentos ou chamados. Essas partes serão adicionadas e testadas em etapas próprias, com controles de segurança e permissões.
