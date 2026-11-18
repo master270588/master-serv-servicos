@@ -1,0 +1,19 @@
+services:
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    # Não publicar a porta 3310 na internet. O worker deve acessar este serviço
+    # somente pela rede privada do ambiente de execução.
+    expose:
+      - "3310"
+    volumes:
+      - clamav-database:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 3"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  clamav-database:
