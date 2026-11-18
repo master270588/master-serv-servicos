@@ -29,7 +29,7 @@ export class DocumentsController {
   @Roles('provider')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
   uploadOwn(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string },
     @Body('documentType') documentType: string,
     @Req() request: AuthenticatedRequest,
   ) {
