@@ -152,6 +152,24 @@ export class DocumentsService {
     };
   }
 
+  async downloadDocumentForAdmin(documentId: string) {
+    const document = await this.prisma.providerDocument.findUnique({
+      where: { id: documentId },
+      select: {
+        storageKey: true,
+        originalFilename: true,
+        mimeType: true,
+        scanStatus: true,
+      },
+    });
+    if (!document) throw new NotFoundException('Documento não encontrado.');
+    if (document.scanStatus !== 'clean') {
+      throw new ConflictException('O documento só pode ser aberto após verificação antivírus aprovada.');
+    }
+    const stream = await this.storage.getFromQuarantine(document.storageKey);
+    return { stream, mimeType: document.mimeType, filename: document.originalFilename };
+  }
+
   async reviewDocument(
     documentId: string,
     reviewerUserId: string,
