@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -27,7 +28,16 @@ export class DocumentsController {
   @Post('providers/me/documents')
   @UseGuards(RolesGuard)
   @Roles('provider')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    fileFilter: (_request, file, callback) => {
+      const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+      if (!allowedMimeTypes.includes(file.mimetype)) {
+        return callback(new BadRequestException('Formato não permitido. Envie PDF, JPEG ou PNG.'), false);
+      }
+      callback(null, true);
+    },
+  }))
   uploadOwn(
     @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string },
     @Body('documentType') documentType: string,
