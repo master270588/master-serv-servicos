@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +10,7 @@ import { R2QuarantineStorageService } from '../storage/r2-quarantine-storage.ser
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: R2QuarantineStorageService,
@@ -36,20 +38,33 @@ export class DocumentsService {
     const safeFilename = (file.originalname || 'documento')
       .replace(/[\\/\\0-\\x1f\\x7f]/g, '_')
       .slice(0, 180);
-    const document = await this.prisma.providerDocument.create({
-      data: {
-        providerUserId,
-        documentType,
-        storageKey: stored.storageKey,
-        originalFilename: safeFilename || 'documento',
-        mimeType: file.mimetype,
-        sizeBytes: BigInt(stored.sizeBytes),
-        reviewStatus: 'pending',
-        scanStatus: 'pending',
-      },
-      select: { id: true, documentType: true, originalFilename: true, mimeType: true, sizeBytes: true, reviewStatus: true, scanStatus: true, createdAt: true },
-    });
-    return { ...document, sizeBytes: document.sizeBytes.toString() };
+    try {
+      const document = await this.prisma.providerDocument.create({
+        data: {
+          providerUserId,
+          documentType,
+          storageKey: stored.storageKey,
+          originalFilename: safeFilename || 'documento',
+          mimeType: file.mimetype,
+          sizeBytes: BigInt(stored.sizeBytes),
+          reviewStatus: 'pending',
+          scanStatus: 'pending',
+        },
+        select: { id: true, documentType: true, originalFilename: true, mimeType: true, sizeBytes: true, reviewStatus: true, scanStatus: true, createdAt: true },
+      });
+      return { ...document, sizeBytes: document.sizeBytes.toString() };
+    } catch (error) {
+      // Compensação: evita deixar objeto órfão no bucket quando a gravação no banco falha.
+      try {
+        await this.storage.deleteFromQuarantine(stored.storageKey);
+      } catch (cleanupError) {
+        this.logger.error(
+          'Falha ao remover objeto órfão da quarentena; requer reconciliação operacional.',
+          cleanupError instanceof Error ? cleanupError.stack : undefined,
+        );
+      }
+      throw error;
+    }
   }
 
   async listOwnDocuments(providerUserId: string) {
@@ -99,6 +114,7 @@ export class DocumentsService {
         mimeType: true,
         sizeBytes: true,
         reviewStatus: true,
+        scanStatus: true,
         expiresAt: true,
         reviewedBy: true,
         reviewedAt: true,
