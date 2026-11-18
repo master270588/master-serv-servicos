@@ -32,6 +32,27 @@ services:
       retries: 5
       start_period: 120s
 
+  api:
+    profiles: ["app"]
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: master-serv-api
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:?Defina DATABASE_URL_DOCKER no arquivo .env da raiz}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+
 volumes:
   master_serv_clamav_db:
   master_serv_pgdata:
