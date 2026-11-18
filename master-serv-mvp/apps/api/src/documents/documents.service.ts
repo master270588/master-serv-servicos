@@ -5,10 +5,52 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { R2QuarantineStorageService } from '../storage/r2-quarantine-storage.service';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: R2QuarantineStorageService,
+  ) {}
+
+  async uploadOwnDocument(providerUserId: string, file: Express.Multer.File, documentType: string) {
+    const allowedTypes = ['identity', 'address', 'professional_certificate', 'other'];
+    if (!allowedTypes.includes(documentType)) {
+      throw new BadRequestException('Tipo de documento inválido.');
+    }
+    if (!file?.buffer || !file.mimetype) {
+      throw new BadRequestException('Envie um arquivo válido.');
+    }
+    const provider = await this.prisma.providerProfile.findUnique({
+      where: { userId: providerUserId },
+      select: { userId: true },
+    });
+    if (!provider) throw new NotFoundException('Perfil de prestador não encontrado.');
+
+    const stored = await this.storage.storeInQuarantine({
+      providerUserId,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
+    const safeFilename = (file.originalname || 'documento')
+      .replace(/[\\/\\0-\\x1f\\x7f]/g, '_')
+      .slice(0, 180);
+    const document = await this.prisma.providerDocument.create({
+      data: {
+        providerUserId,
+        documentType,
+        storageKey: stored.storageKey,
+        originalFilename: safeFilename || 'documento',
+        mimeType: file.mimetype,
+        sizeBytes: BigInt(stored.sizeBytes),
+        reviewStatus: 'pending',
+        scanStatus: 'pending',
+      },
+      select: { id: true, documentType: true, originalFilename: true, mimeType: true, sizeBytes: true, reviewStatus: true, scanStatus: true, createdAt: true },
+    });
+    return { ...document, sizeBytes: document.sizeBytes.toString() };
+  }
 
   async listOwnDocuments(providerUserId: string) {
     const provider = await this.prisma.providerProfile.findUnique({
@@ -26,6 +68,7 @@ export class DocumentsService {
         mimeType: true,
         sizeBytes: true,
         reviewStatus: true,
+        scanStatus: true,
         expiresAt: true,
         reviewedAt: true,
         rejectionReason: true,
