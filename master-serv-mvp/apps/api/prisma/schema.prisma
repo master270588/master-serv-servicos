@@ -11,6 +11,7 @@ model AppUser {
  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
  roles UserRole[]
  provider ProviderProfile?
+ sessions AuthSession[]
  @@map("app_users")
 }
 model Role {
@@ -42,4 +43,16 @@ model ServiceCategory {
  name String @unique
  active Boolean @default(true)
  @@map("service_categories")
+}
+model AuthSession {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ refreshTokenHash String @unique @map("refresh_token_hash")
+ expiresAt DateTime @map("expires_at") @db.Timestamptz
+ revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ user AppUser @relation(fields:[userId], references:[id], onDelete:Cascade)
+ @@index([userId, revokedAt])
+ @@index([expiresAt])
+ @@map("auth_sessions")
 }
