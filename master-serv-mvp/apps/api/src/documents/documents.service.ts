@@ -17,7 +17,7 @@ export class DocumentsService {
     });
     if (!provider) throw new NotFoundException('Perfil de prestador não encontrado.');
 
-    return this.prisma.providerDocument.findMany({
+    const documents = await this.prisma.providerDocument.findMany({
       where: { providerUserId },
       select: {
         id: true,
@@ -33,6 +33,10 @@ export class DocumentsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return documents.map((document) => ({
+      ...document,
+      sizeBytes: document.sizeBytes.toString(),
+    }));
   }
 
   async listProviderDocuments(providerUserId: string) {
@@ -42,7 +46,7 @@ export class DocumentsService {
     });
     if (!provider) throw new NotFoundException('Perfil de prestador não encontrado.');
 
-    return this.prisma.providerDocument.findMany({
+    const documents = await this.prisma.providerDocument.findMany({
       where: { providerUserId },
       select: {
         id: true,
@@ -60,6 +64,10 @@ export class DocumentsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+    return documents.map((document) => ({
+      ...document,
+      sizeBytes: document.sizeBytes.toString(),
+    }));
   }
 
   async reviewDocument(
