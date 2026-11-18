@@ -8,7 +8,17 @@ import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      validate: (config: Record<string, unknown>) => {
+        const secret = config.JWT_ACCESS_SECRET;
+        if (typeof secret !== 'string' || secret.length < 32) {
+          throw new Error('JWT_ACCESS_SECRET deve ter pelo menos 32 caracteres.');
+        }
+        return config;
+      },
+    }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     PrismaModule,
     HealthModule,
