@@ -14,7 +14,7 @@ export class DocumentsService {
     private readonly storage: R2QuarantineStorageService,
   ) {}
 
-  async uploadOwnDocument(providerUserId: string, file: Express.Multer.File, documentType: string) {
+  async uploadOwnDocument(providerUserId: string, file: { buffer: Buffer; mimetype: string; originalname: string }, documentType: string) {
     const allowedTypes = ['identity', 'address', 'professional_certificate', 'other'];
     if (!allowedTypes.includes(documentType)) {
       throw new BadRequestException('Tipo de documento inválido.');
