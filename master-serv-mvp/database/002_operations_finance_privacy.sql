@@ -31,7 +31,7 @@ CREATE TABLE provider_documents (
   review_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (review_status IN ('pending','approved','rejected','expired')),
   expires_at DATE,
-  reviewed_by UUID REFERENCES app_users(id),
+  reviewed_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMPTZ,
   rejection_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -49,7 +49,7 @@ CREATE TABLE dispatch_batches (
 );
 CREATE TABLE dispatch_candidates (
   batch_id UUID NOT NULL REFERENCES dispatch_batches(id) ON DELETE CASCADE,
-  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id),
+  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE RESTRICT,
   response_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (response_status IN ('pending','accepted','declined','expired')),
   responded_at TIMESTAMPTZ,
@@ -60,8 +60,8 @@ CREATE INDEX idx_dispatch_candidates_provider ON dispatch_candidates(provider_us
 CREATE TABLE order_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
-  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id),
-  assigned_by UUID REFERENCES app_users(id),
+  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE RESTRICT,
+  assigned_by UUID REFERENCES app_users(id) ON DELETE RESTRICT,
   status TEXT NOT NULL DEFAULT 'assigned'
     CHECK (status IN ('assigned','accepted','declined','released','completed')),
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -72,9 +72,9 @@ CREATE INDEX idx_assignments_provider ON order_assignments(provider_user_id, sta
 
 CREATE TABLE payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES service_orders(id),
-  customer_user_id UUID NOT NULL REFERENCES app_users(id),
-  provider_user_id UUID REFERENCES provider_profiles(user_id),
+  order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT,
+  customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT,
+  provider_user_id UUID REFERENCES provider_profiles(user_id) ON DELETE RESTRICT,
   method TEXT NOT NULL CHECK (method IN ('pix','card','cash','bank_transfer','other')),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','authorized','paid','partially_refunded','refunded','failed','cancelled')),
@@ -88,8 +88,8 @@ CREATE INDEX idx_payments_order ON payment_transactions(order_id, created_at DES
 
 CREATE TABLE financial_ledger_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  transaction_id UUID REFERENCES payment_transactions(id),
-  order_id UUID NOT NULL REFERENCES service_orders(id),
+  transaction_id UUID REFERENCES payment_transactions(id) ON DELETE RESTRICT,
+  order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT,
   entry_type TEXT NOT NULL CHECK (entry_type IN ('customer_payment','provider_payout','platform_commission','refund','adjustment')),
   direction TEXT NOT NULL CHECK (direction IN ('credit','debit')),
   amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
@@ -100,8 +100,8 @@ CREATE INDEX idx_ledger_order ON financial_ledger_entries(order_id, created_at);
 
 CREATE TABLE commission_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES service_orders(id),
-  payment_transaction_id UUID REFERENCES payment_transactions(id),
+  order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT,
+  payment_transaction_id UUID REFERENCES payment_transactions(id) ON DELETE RESTRICT,
   gross_amount_cents BIGINT NOT NULL CHECK (gross_amount_cents > 0),
   rate_basis_points INTEGER NOT NULL DEFAULT 1000 CHECK (rate_basis_points BETWEEN 0 AND 10000),
   commission_amount_cents BIGINT NOT NULL CHECK (commission_amount_cents >= 0),
@@ -116,8 +116,8 @@ CREATE TABLE loyalty_accounts (
 );
 CREATE TABLE loyalty_ledger (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_user_id UUID NOT NULL REFERENCES app_users(id),
-  order_id UUID REFERENCES service_orders(id),
+  customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT,
+  order_id UUID REFERENCES service_orders(id) ON DELETE RESTRICT,
   points_delta BIGINT NOT NULL CHECK (points_delta <> 0),
   description TEXT NOT NULL,
   idempotency_key TEXT NOT NULL UNIQUE,
