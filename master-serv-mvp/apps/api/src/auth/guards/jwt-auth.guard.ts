@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
 
 export interface AuthenticatedRequest extends Request {
   user: { sub: string; roles: string[] };
@@ -9,7 +10,11 @@ export interface AuthenticatedRequest extends Request {
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -25,6 +30,8 @@ export class JwtAuthGuard implements CanActivate {
         audience: 'master-serv-app',
       });
       if (!payload.sub || !Array.isArray(payload.roles)) throw new Error('Invalid token claims');
+      const account = await this.prisma.appUser.findUnique({ where: { id: payload.sub }, select: { status: true } });
+      if (!account || account.status !== 'active') throw new UnauthorizedException('Conta indisponível.');
       request.user = { sub: payload.sub, roles: payload.roles };
       return true;
     } catch {
