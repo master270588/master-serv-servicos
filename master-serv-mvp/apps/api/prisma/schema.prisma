@@ -224,7 +224,7 @@ model OrderAssignment {
   endedAt        DateTime?       @map("ended_at") @db.Timestamptz
   order          ServiceOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   provider       ProviderProfile @relation(fields: [providerUserId], references: [userId])
-  actor          AppUser?        @relation("AssignmentActor", fields: [assignedBy], references: [id])
+  actor          AppUser?        @relation("AssignmentActor", fields: [assignedBy], references: [id], onDelete: SetNull)
 
   @@index([orderId, assignedAt(sort: Desc)], map: "idx_assignments_order")
   @@index([providerUserId, status], map: "idx_assignments_provider")
