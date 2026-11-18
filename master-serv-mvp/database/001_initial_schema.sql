@@ -24,14 +24,14 @@ INSERT INTO roles (code) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 CREATE TABLE user_roles (
-  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
-  role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
+  user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, role_id)
 );
 
 CREATE TABLE provider_profiles (
-  user_id UUID PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE,
+  user_id UUID PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE ON UPDATE CASCADE,
   display_name TEXT NOT NULL,
   approval_status TEXT NOT NULL DEFAULT 'pending'
     CHECK (approval_status IN ('pending','under_review','approved','correction_needed','rejected','blocked')),
@@ -46,15 +46,15 @@ CREATE TABLE service_categories (
 );
 
 CREATE TABLE provider_services (
-  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE CASCADE,
-  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT,
+  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   PRIMARY KEY (provider_user_id, category_id)
 );
 
 CREATE TABLE service_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT,
-  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT,
+  customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   description TEXT NOT NULL,
   city TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'requested'
@@ -66,8 +66,8 @@ CREATE TABLE service_orders (
 
 CREATE TABLE quotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT,
-  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE RESTRICT,
+  order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE RESTRICT ON UPDATE CASCADE,
   amount_cents BIGINT NOT NULL CHECK (amount_cents > 0),
   status TEXT NOT NULL DEFAULT 'submitted'
     CHECK (status IN ('submitted','approved','rejected','expired','withdrawn')),
@@ -77,7 +77,7 @@ CREATE TABLE quotes (
 
 CREATE TABLE audit_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_user_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
+  actor_user_id UUID REFERENCES app_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
   action TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID,
