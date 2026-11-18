@@ -6,6 +6,7 @@ describe('DocumentsService', () => {
   const prisma = {
     providerProfile: { findUnique: jest.fn() },
     providerDocument: {
+      create: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
@@ -13,11 +14,12 @@ describe('DocumentsService', () => {
     $transaction: jest.fn(),
   };
 
+  const storage = { storeInQuarantine: jest.fn() };
   let service: DocumentsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new DocumentsService(prisma as unknown as PrismaService);
+    service = new DocumentsService(prisma as unknown as PrismaService, storage as any);
   });
 
   it('lists only the authenticated provider documents and omits storage keys', async () => {
@@ -34,6 +36,23 @@ describe('DocumentsService', () => {
     );
   });
 
+  it('stores an uploaded document in quarantine and records pending scan metadata', async () => {
+    prisma.providerProfile.findUnique.mockResolvedValue({ userId: 'provider-1' });
+    storage.storeInQuarantine.mockResolvedValue({ storageKey: 'quarantine/providers/provider-1/random', sizeBytes: 8 });
+    prisma.providerDocument.create.mockResolvedValue({
+      id: 'doc-1', documentType: 'identity', originalFilename: 'id.pdf', mimeType: 'application/pdf',
+      sizeBytes: BigInt(8), reviewStatus: 'pending', scanStatus: 'pending', createdAt: new Date(),
+    });
+    const result = await service.uploadOwnDocument('provider-1', {
+      buffer: Buffer.from('%PDF-123'), mimetype: 'application/pdf', originalname: 'id.pdf',
+    } as Express.Multer.File, 'identity');
+    expect(storage.storeInQuarantine).toHaveBeenCalledWith(expect.objectContaining({ providerUserId: 'provider-1' }));
+    expect(prisma.providerDocument.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ storageKey: 'quarantine/providers/provider-1/random', scanStatus: 'pending', reviewStatus: 'pending' }),
+    }));
+    expect(result.sizeBytes).toBe('8');
+  });
+
   it('requires a reason when rejecting a document', async () => {
     await expect(
       service.reviewDocument('document-1', 'admin-1', 'rejected'),
@@ -48,6 +67,7 @@ describe('DocumentsService', () => {
           id: 'document-1',
           providerUserId: 'provider-1',
           reviewStatus: 'pending',
+          scanStatus: 'pending',
         }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
