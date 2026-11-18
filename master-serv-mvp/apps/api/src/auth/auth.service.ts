@@ -142,6 +142,15 @@ export class AuthService {
     return { ...tokens };
   }
 
+  async getProfile(userId: string) {
+    const user = await this.prisma.appUser.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, phone: true, status: true, roles: { select: { role: { select: { code: true } } } } },
+    });
+    if (!user || user.status !== 'active') throw new UnauthorizedException('Conta indisponível.');
+    return { id: user.id, email: user.email, phone: user.phone, roles: user.roles.map((item) => item.role.code) };
+  }
+
   async logout(rawToken: string) {
     await this.prisma.authSession.updateMany({
       where: { refreshTokenHash: this.hashToken(rawToken), revokedAt: null },
