@@ -1,0 +1,37 @@
+name: MASTER SERV API checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "master-serv-mvp/apps/api/**"
+      - "master-serv-mvp/database/**"
+      - ".github/workflows/api-check.yml"
+  pull_request:
+    paths:
+      - "master-serv-mvp/apps/api/**"
+      - "master-serv-mvp/database/**"
+      - ".github/workflows/api-check.yml"
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: master-serv-mvp/apps/api
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/master_serv_ci?schema=public
+      JWT_ACCESS_SECRET: ci-only-secret-value-not-for-production-123456789
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Build API
+        run: npm run build
