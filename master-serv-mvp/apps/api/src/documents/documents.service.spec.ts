@@ -8,6 +8,7 @@ describe('DocumentsService', () => {
     providerDocument: {
       create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -70,6 +71,47 @@ describe('DocumentsService', () => {
     expect(storage.deleteFromQuarantine).toHaveBeenCalledWith(
       'quarantine/providers/provider-1/orphan',
     );
+  });
+
+  it('allows download only for the owning provider after clean scan and approval', async () => {
+    const stream = { pipe: jest.fn() };
+    prisma.providerDocument.findFirst.mockResolvedValue({
+      storageKey: 'quarantine/providers/provider-1/document-1',
+      originalFilename: 'comprovante.pdf',
+      mimeType: 'application/pdf',
+      scanStatus: 'clean',
+      reviewStatus: 'approved',
+    });
+    storage.getFromQuarantine = jest.fn().mockResolvedValue(stream);
+
+    const result = await service.downloadOwnDocument('provider-1', 'document-1');
+
+    expect(prisma.providerDocument.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'document-1', providerUserId: 'provider-1' },
+    }));
+    expect(storage.getFromQuarantine).toHaveBeenCalledWith(
+      'quarantine/providers/provider-1/document-1',
+    );
+    expect(result).toEqual({
+      stream,
+      mimeType: 'application/pdf',
+      filename: 'comprovante.pdf',
+    });
+  });
+
+  it('blocks document download until antivirus scan and administrative approval are complete', async () => {
+    prisma.providerDocument.findFirst.mockResolvedValue({
+      storageKey: 'quarantine/providers/provider-1/document-1',
+      originalFilename: 'comprovante.pdf',
+      mimeType: 'application/pdf',
+      scanStatus: 'pending',
+      reviewStatus: 'pending',
+    });
+
+    await expect(
+      service.downloadOwnDocument('provider-1', 'document-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.getFromQuarantine).toBeUndefined();
   });
 
   it('requires a reason when rejecting a document', async () => {
