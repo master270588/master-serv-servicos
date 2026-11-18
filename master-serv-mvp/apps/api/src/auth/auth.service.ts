@@ -127,19 +127,46 @@ export class AuthService {
     if (!session || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== 'active') {
       throw new UnauthorizedException('Sessão inválida ou expirada.');
     }
-    const rotated = await this.prisma.$transaction(async (tx) => {
+
+    const secret = this.config.get<string>('JWT_ACCESS_SECRET');
+    if (!secret || secret.length < 32) {
+      throw new InternalServerErrorException('Autenticação não configurada no servidor.');
+    }
+
+    // Prepare the replacement credentials before consuming the current session.
+    const accessToken = await this.jwt.signAsync({
+      sub: session.user.id,
+      roles: session.user.roles.map((item) => item.role.code),
+    });
+    const refreshToken = randomBytes(48).toString('base64url');
+    const refreshTokenHash = this.hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+    await this.prisma.$transaction(async (tx) => {
       const result = await tx.authSession.updateMany({
         where: { id: session.id, revokedAt: null, expiresAt: { gt: new Date() } },
         data: { revokedAt: new Date() },
       });
-      if (result.count !== 1) throw new UnauthorizedException('Sessão inválida ou expirada.');
-      return tx.appUser.findUniqueOrThrow({
-        where: { id: session.userId },
-        select: { id: true, email: true, phone: true, roles: { select: { role: { select: { code: true } } } } },
+      if (result.count !== 1) {
+        throw new UnauthorizedException('Sessão inválida ou expirada.');
+      }
+
+      await tx.authSession.create({
+        data: {
+          userId: session.user.id,
+          refreshTokenHash,
+          expiresAt,
+        },
       });
     });
-    const tokens = await this.issueTokens(rotated);
-    return { ...tokens };
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn: 900,
+      refreshExpiresAt: expiresAt.toISOString(),
+    };
   }
 
   async listPendingProviders() {
