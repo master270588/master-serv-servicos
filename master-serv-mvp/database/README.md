@@ -12,8 +12,9 @@ As migrações SQL são a sequência de criação/evolução do banco. O Prisma 
 2. `002_operations_finance_privacy.sql`
 3. `003_auth_sessions.sql`
 4. `004_audit_indexes.sql`
+5. `005_provider_document_scan_status.sql`
 
-Execute e valide primeiro em um banco PostgreSQL descartável/de desenvolvimento. As migrações devem ser aplicadas uma única vez e na ordem indicada. A migração 004 usa `IF NOT EXISTS` para permitir repetição segura dos índices.
+Execute e valide primeiro em um banco PostgreSQL descartável/de desenvolvimento. As migrações devem ser aplicadas uma única vez e na ordem indicada. As migrações 004 e 005 usam `IF NOT EXISTS` para permitir repetição segura dos índices/coluna. A 005 separa o status da análise administrativa (`review_status`) do estado da verificação antivírus (`scan_status`).
 
 ## Validação do modelo
 
