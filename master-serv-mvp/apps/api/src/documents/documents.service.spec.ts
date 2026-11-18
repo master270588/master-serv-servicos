@@ -14,7 +14,7 @@ describe('DocumentsService', () => {
     $transaction: jest.fn(),
   };
 
-  const storage = { storeInQuarantine: jest.fn() };
+  const storage = { storeInQuarantine: jest.fn(), deleteFromQuarantine: jest.fn() };
   let service: DocumentsService;
 
   beforeEach(() => {
@@ -51,6 +51,25 @@ describe('DocumentsService', () => {
       data: expect.objectContaining({ storageKey: 'quarantine/providers/provider-1/random', scanStatus: 'pending', reviewStatus: 'pending' }),
     }));
     expect(result.sizeBytes).toBe('8');
+  });
+
+  it('removes the quarantined object if database metadata persistence fails', async () => {
+    prisma.providerProfile.findUnique.mockResolvedValue({ userId: 'provider-1' });
+    storage.storeInQuarantine.mockResolvedValue({
+      storageKey: 'quarantine/providers/provider-1/orphan',
+      sizeBytes: 8,
+    });
+    prisma.providerDocument.create.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(service.uploadOwnDocument('provider-1', {
+      buffer: Buffer.from('%PDF-123'),
+      mimetype: 'application/pdf',
+      originalname: 'id.pdf',
+    }, 'identity')).rejects.toThrow('database unavailable');
+
+    expect(storage.deleteFromQuarantine).toHaveBeenCalledWith(
+      'quarantine/providers/provider-1/orphan',
+    );
   });
 
   it('requires a reason when rejecting a document', async () => {
