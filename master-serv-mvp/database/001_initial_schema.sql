@@ -77,7 +77,7 @@ CREATE TABLE quotes (
 
 CREATE TABLE audit_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_user_id UUID REFERENCES app_users(id) ON DELETE RESTRICT,
+  actor_user_id UUID REFERENCES app_users(id) ON DELETE SET NULL,
   action TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID,
