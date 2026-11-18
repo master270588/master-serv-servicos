@@ -80,6 +80,22 @@ export class DocumentsController {
     return this.documents.listProviderDocuments(providerId);
   }
 
+  @Get('admin/provider-documents/:documentId/file')
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'super_admin')
+  async downloadForReview(
+    @Param('documentId', new ParseUUIDPipe()) documentId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const document = await this.documents.downloadDocumentForAdmin(documentId);
+    const safeFilename = document.filename.replace(/[\\"\r\n]/g, '_');
+    response.setHeader('Content-Type', document.mimeType);
+    response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(safeFilename)}`);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(document.stream);
+  }
+
   @Patch('admin/provider-documents/:documentId/review')
   @UseGuards(RolesGuard)
   @Roles('admin', 'super_admin')
