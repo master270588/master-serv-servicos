@@ -140,8 +140,8 @@ model AuditEvent {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
   actor       AppUser? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  @@index([actorUserId, createdAt])
-  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt], map: "idx_audit_events_actor_created")
+  @@index([entityType, entityId, createdAt], map: "idx_audit_events_entity_created")
   @@map("audit_events")
 }
 
@@ -181,9 +181,10 @@ model ProviderDocument {
   rejectionReason  String?         @map("rejection_reason")
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz
   provider         ProviderProfile @relation(fields: [providerUserId], references: [userId], onDelete: Cascade)
-  reviewer         AppUser?        @relation("DocumentReviewer", fields: [reviewedBy], references: [id])
+  reviewer         AppUser?        @relation("DocumentReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([providerUserId, reviewStatus], map: "idx_provider_documents_review")
+  @@index([scanStatus, createdAt], map: "idx_provider_documents_scan_status")
   @@map("provider_documents")
 }
 
@@ -346,7 +347,7 @@ model AuthSession {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
   user             AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, revokedAt])
-  @@index([expiresAt])
+  @@index([userId, revokedAt], map: "idx_auth_sessions_user_revoked")
+  @@index([expiresAt], map: "idx_auth_sessions_expires")
   @@map("auth_sessions")
 }
