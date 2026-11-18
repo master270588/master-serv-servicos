@@ -8,7 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector, private readonly prisma: PrismaService) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const required = this.reflector.getAllAndOverride<string[]>(REQUIRED_ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -16,10 +16,11 @@ export class RolesGuard implements CanActivate {
     if (!required?.length) return true;
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     if (!request.user?.sub) throw new ForbiddenException('Usuário não autenticado.');
-    return this.prisma.userRole.findMany({
+    const assignments = await this.prisma.userRole.findMany({
       where: { userId: request.user.sub },
       select: { role: { select: { code: true } } },
-    }).then((assignments) => {
+    });
+    {
       const currentRoles = assignments.map((item) => item.role.code);
       const allowed = required.some((role) => currentRoles.includes(role));
       if (!allowed) throw new ForbiddenException('Você não tem permissão para esta operação.');
