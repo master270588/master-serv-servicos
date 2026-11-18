@@ -21,13 +21,14 @@ Definir os controles mínimos antes de receber documentos de identidade, comprov
 - As respostas das listagens não expõem `storageKey`.
 
 ### Ainda não está implementado/verificado
-- Upload e download de arquivos ainda não estão disponíveis.
-- Não há integração de armazenamento de objetos configurada.
-- Não há URL assinada, varredura antivírus, validação real do conteúdo do arquivo ou rotina de expiração/exclusão.
+- O código de upload em quarentena para Cloudflare R2 foi implementado, com limite de 10 MiB, allowlist de PDF/JPEG/PNG e validação de assinatura binária. O uso real depende de bucket e credenciais configurados.
+- A rotina de compensação tenta remover o objeto da quarentena se a gravação dos metadados no PostgreSQL falhar.
+- Um worker de varredura ClamAV foi adicionado. Ele deve ser executado em rede privada, com acesso ao bucket e ao PostgreSQL; ainda requer implantação e teste de integração real.
+- Download e URLs assinadas não estão liberados.
 - O modelo de consentimento existe, mas não foi localizado fluxo de API para registrar/consultar/revogar consentimentos.
 - Não há banco PostgreSQL conectado nem teste ponta a ponta com armazenamento real.
 
-**Conclusão:** o módulo inicial de consulta de metadados e revisão administrativa foi criado, mas o ciclo seguro de arquivos ainda não está pronto para uso real. Não solicitar documentos reais nem habilitar upload em produção nesta etapa.
+**Conclusão:** o fluxo de upload em quarentena e o worker ClamAV existem no código, mas dependem de provisionamento e testes ponta a ponta. Não solicitar documentos reais nem habilitar uso em produção antes de validar storage, PostgreSQL, scanner, autorização e recuperação de falhas.
 
 ## Decisão de armazenamento
 A opção técnica selecionada para a próxima implementação é **Cloudflare R2 usando a API compatível com S3**.
@@ -59,11 +60,29 @@ As variáveis de configuração de referência estão em `apps/api/.env.example`
 - [x] Criar rotas autenticadas de consulta de metadados e revisão administrativa.
 - [x] Registrar auditoria de aprovação/rejeição de documentos na mesma transação.
 - [ ] Provisionar bucket privado e credenciais com privilégio mínimo.
-- [ ] Implementar upload em quarentena e download autorizado.
-- [ ] Integrar varredura antimalware e fluxo de liberação.
+- [x] Implementar upload em quarentena com validação de MIME/assinatura e compensação em falha de persistência.
+- [x] Criar worker ClamAV fail-closed para marcar arquivos como clean/infected/error e registrar auditoria.
+- [ ] Provisionar R2 e executar teste de integração do upload.
+- [ ] Implantar ClamAV em rede privada e agendar o worker `npm run documents:scan`.
+- [ ] Implementar download autorizado e URLs assinadas curtas.
 - [ ] Implementar consentimentos e política de retenção.
 - [ ] Adicionar testes de integração com PostgreSQL e storage de teste.
 - [ ] Executar revisão de segurança antes de habilitar dados reais.
 
 ## Regra de liberação
 A funcionalidade só poderá ser considerada pronta após testes automatizados e manuais com PostgreSQL e storage configurados, verificação dos controles acima e aprovação operacional. A aprovação do CI de build e testes unitários não equivale a essa liberação.
+
+
+## Operação da varredura ClamAV
+
+O worker está em `apps/api/scripts/scan-pending-documents.ts` e é executado com:
+
+```bash
+npm run documents:scan
+```
+
+Configurar `CLAMAV_HOST`, `CLAMAV_PORT`, `S3_*` e `DATABASE_URL` no ambiente do worker. O serviço ClamAV de referência está em `infra/clamav/docker-compose.yml`; ele não publica a porta do daemon no host. O worker e o daemon devem compartilhar uma rede privada e o daemon não pode ficar acessível pela internet.
+
+O worker lê lotes pequenos de documentos pendentes, transmite o conteúdo ao ClamAV pelo protocolo INSTREAM e grava `clean`, `infected` ou `error`. Falhas de conexão, leitura ou resposta resultam em `error`, nunca em `clean`. Cada resultado é registrado em `AuditEvent`. O worker não aprova documentos automaticamente: a aprovação administrativa continua exigindo `scanStatus = clean`.
+
+Agendar a execução em intervalo curto por cron/worker manager, monitorar erros e reprocessar documentos com estado `error` somente após corrigir a causa. Antes da produção, validar com arquivos de teste inofensivos e com o arquivo de teste EICAR em ambiente isolado, sem usar documentos pessoais reais. Nunca disponibilizar o arquivo antes do estado `clean`.
