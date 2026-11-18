@@ -142,6 +142,38 @@ export class AuthService {
     return { ...tokens };
   }
 
+  async listPendingProviders() {
+    return this.prisma.providerProfile.findMany({
+      where: { approvalStatus: { in: ['pending', 'under_review'] } },
+      select: {
+        userId: true,
+        displayName: true,
+        approvalStatus: true,
+        createdAt: true,
+        user: { select: { email: true, phone: true, status: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async reviewProvider(providerUserId: string, decision: 'approved' | 'rejected', reviewerUserId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const profile = await tx.providerProfile.findUnique({ where: { userId: providerUserId } });
+      if (!profile) throw new BadRequestException('Prestador não encontrado.');
+      if (profile.approvalStatus === 'blocked') throw new BadRequestException('Prestador bloqueado não pode ser aprovado por este fluxo.');
+      const updated = await tx.providerProfile.update({
+        where: { userId: providerUserId },
+        data: { approvalStatus: decision },
+        select: { userId: true, displayName: true, approvalStatus: true },
+      });
+      await tx.appUser.update({
+        where: { id: providerUserId },
+        data: { status: decision === 'approved' ? 'active' : 'blocked' },
+      });
+      return { ...updated, accountStatus: decision === 'approved' ? 'active' : 'blocked' };
+    });
+  }
+
   async getProfile(userId: string) {
     const user = await this.prisma.appUser.findUnique({
       where: { id: userId },
