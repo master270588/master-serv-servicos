@@ -126,11 +126,15 @@ export class DocumentsService {
     return this.prisma.$transaction(async (tx) => {
       const document = await tx.providerDocument.findUnique({
         where: { id: documentId },
-        select: { id: true, providerUserId: true, reviewStatus: true },
+        select: { id: true, providerUserId: true, reviewStatus: true, scanStatus: true },
       });
       if (!document) throw new NotFoundException('Documento não encontrado.');
       if (document.reviewStatus !== 'pending') {
         throw new ConflictException('Somente documentos pendentes podem ser analisados.');
+      }
+
+      if (decision === 'approved' && document.scanStatus !== 'clean') {
+        throw new ConflictException('O documento precisa passar pela verificação antivírus antes da aprovação.');
       }
 
       const now = new Date();
