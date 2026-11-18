@@ -170,6 +170,15 @@ export class AuthService {
         where: { id: providerUserId },
         data: { status: decision === 'approved' ? 'active' : 'blocked' },
       });
+      await tx.auditEvent.create({
+        data: {
+          actorUserId: reviewerUserId,
+          action: decision === 'approved' ? 'provider.approved' : 'provider.rejected',
+          entityType: 'provider_profile',
+          entityId: providerUserId,
+          metadata: { previousApprovalStatus: profile.approvalStatus, newApprovalStatus: decision },
+        },
+      });
       return { ...updated, accountStatus: decision === 'approved' ? 'active' : 'blocked' };
     });
   }
