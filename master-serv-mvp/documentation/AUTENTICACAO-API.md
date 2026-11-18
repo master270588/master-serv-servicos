@@ -12,6 +12,10 @@ Todas as rotas usam o prefixo global `/api`.
 | POST | `/auth/logout` | Refresh token, limitado | Revoga a sessão |
 | GET | `/auth/me` | JWT Bearer | Retorna o perfil autenticado |
 
+| GET | `/admin/providers/pending` | Admin/super_admin | Lista prestadores aguardando análise |
+| PATCH | `/admin/providers/:id/approve` | Admin/super_admin | Aprova e ativa o cadastro |
+| PATCH | `/admin/providers/:id/reject` | Admin/super_admin | Rejeita e bloqueia o cadastro |
+
 ## Regras atuais
 
 - Senhas são derivadas com Argon2id; nunca devem ser armazenadas em texto puro.
@@ -22,7 +26,8 @@ Todas as rotas usam o prefixo global `/api`.
 - Prestadores são criados como `pending` e não recebem tokens até aprovação/ativação administrativa.
 - Contas bloqueadas ou não ativas não podem autenticar; o guard consulta o status atual da conta.
 - Limitação global configurada em 60 requisições/minuto; cadastro e login em 5/minuto; refresh em 10/minuto.
-- Guards JWT e de papéis estão disponíveis para proteger novos controladores. O endpoint `/auth/me` já usa o guard JWT.
+- Guards JWT e de papéis estão disponíveis para proteger controladores.
+- A administração de prestadores exige `admin` ou `super_admin`; aprovação/rejeição atualiza o perfil e a conta na mesma transação e grava evento de auditoria.
 
 ## Configuração
 
