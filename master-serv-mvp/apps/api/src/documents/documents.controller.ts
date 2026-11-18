@@ -4,7 +4,6 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
-  Observable,
   PayloadTooLargeException,
   Controller,
   StreamableFile,
@@ -28,6 +27,7 @@ import { Roles } from '../auth/guards/roles.decorator';
 import { DocumentsService } from './documents.service';
 import { ReviewDocumentDto } from './dto/review-document.dto';
 import type { Response } from 'express';
+import { Observable } from 'rxjs';
 
 const MulterDocumentInterceptor = FileInterceptor('file', {
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
