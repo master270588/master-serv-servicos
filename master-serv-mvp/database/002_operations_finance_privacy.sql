@@ -74,7 +74,7 @@ CREATE TABLE payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-  provider_user_id UUID REFERENCES provider_profiles(user_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  provider_user_id UUID REFERENCES provider_profiles(user_id) ON DELETE SET NULL ON UPDATE CASCADE,
   method TEXT NOT NULL CHECK (method IN ('pix','card','cash','bank_transfer','other')),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','authorized','paid','partially_refunded','refunded','failed','cancelled')),
@@ -88,7 +88,7 @@ CREATE INDEX idx_payments_order ON payment_transactions(order_id, created_at DES
 
 CREATE TABLE financial_ledger_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  transaction_id UUID REFERENCES payment_transactions(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  transaction_id UUID REFERENCES payment_transactions(id) ON DELETE SET NULL ON UPDATE CASCADE,
   order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   entry_type TEXT NOT NULL CHECK (entry_type IN ('customer_payment','provider_payout','platform_commission','refund','adjustment')),
   direction TEXT NOT NULL CHECK (direction IN ('credit','debit')),
@@ -101,7 +101,7 @@ CREATE INDEX idx_ledger_order ON financial_ledger_entries(order_id, created_at);
 CREATE TABLE commission_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-  payment_transaction_id UUID REFERENCES payment_transactions(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  payment_transaction_id UUID REFERENCES payment_transactions(id) ON DELETE SET NULL ON UPDATE CASCADE,
   gross_amount_cents BIGINT NOT NULL CHECK (gross_amount_cents > 0),
   rate_basis_points INTEGER NOT NULL DEFAULT 1000 CHECK (rate_basis_points BETWEEN 0 AND 10000),
   commission_amount_cents BIGINT NOT NULL CHECK (commission_amount_cents >= 0),
@@ -117,7 +117,7 @@ CREATE TABLE loyalty_accounts (
 CREATE TABLE loyalty_ledger (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_user_id UUID NOT NULL REFERENCES app_users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-  order_id UUID REFERENCES service_orders(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  order_id UUID REFERENCES service_orders(id) ON DELETE SET NULL ON UPDATE CASCADE,
   points_delta BIGINT NOT NULL CHECK (points_delta <> 0),
   description TEXT NOT NULL,
   idempotency_key TEXT NOT NULL UNIQUE,
