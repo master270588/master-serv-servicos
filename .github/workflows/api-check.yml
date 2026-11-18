@@ -6,6 +6,9 @@ on:
     paths:
       - "master-serv-mvp/apps/api/**"
       - "master-serv-mvp/database/**"
+      - "master-serv-mvp/docker-compose.yml"
+      - "master-serv-mvp/.env.example"
+      - "master-serv-mvp/README.md"
       - ".github/workflows/api-check.yml"
   pull_request:
     paths:
@@ -45,3 +48,5 @@ jobs:
         run: npx tsc --noEmit --skipLibCheck --target ES2021 --module commonjs --moduleResolution node scripts/scan-pending-documents.ts
       - name: Build API
         run: npm run build
+      - name: Build production Docker image
+        run: docker build --tag master-serv-api-ci .
