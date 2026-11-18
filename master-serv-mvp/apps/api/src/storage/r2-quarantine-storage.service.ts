@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import type { Readable } from 'node:stream';
 
 const FILE_SIGNATURES: Record<string, (buffer: Buffer) => boolean> = {
   'application/pdf': (buffer) => buffer.subarray(0, 5).toString('ascii') === '%PDF-',
@@ -81,6 +82,27 @@ export class R2QuarantineStorageService {
     return { storageKey, sizeBytes: input.buffer.length };
   }
 
+
+  async getFromQuarantine(storageKey: string): Promise<Readable> {
+    if (!storageKey.startsWith('quarantine/providers/')) {
+      throw new BadRequestException('Chave de armazenamento inválida.');
+    }
+    const bucket = this.config.get<string>('S3_BUCKET');
+    if (!bucket) {
+      throw new ServiceUnavailableException('Armazenamento de documentos não configurado.');
+    }
+    try {
+      const response = await this.getClient().send(
+        new GetObjectCommand({ Bucket: bucket, Key: storageKey }),
+      );
+      if (!response.Body || typeof (response.Body as Readable).pipe !== 'function') {
+        throw new Error('Resposta de armazenamento sem stream.');
+      }
+      return response.Body as Readable;
+    } catch {
+      throw new ServiceUnavailableException('Não foi possível recuperar o documento.');
+    }
+  }
 
   async deleteFromQuarantine(storageKey: string): Promise<void> {
     if (!storageKey.startsWith('quarantine/providers/')) {
