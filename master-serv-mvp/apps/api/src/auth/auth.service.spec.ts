@@ -98,3 +98,113 @@ describe('AuthService refresh rotation', () => {
     expect(tx.authSession.create).not.toHaveBeenCalled();
   });
 });
+
+
+describe('AuthService provider review', () => {
+  let service: AuthService;
+  let tx: any;
+  let prisma: PrismaService;
+
+  const profile = {
+    userId: 'provider-1',
+    displayName: 'Profissional Teste',
+    approvalStatus: 'pending',
+  };
+
+  beforeEach(() => {
+    tx = {
+      providerProfile: {
+        findUnique: jest.fn().mockResolvedValue(profile),
+        update: jest.fn().mockImplementation(async ({ data, select }) => ({
+          userId: profile.userId,
+          displayName: profile.displayName,
+          approvalStatus: data.approvalStatus,
+        })),
+      },
+      appUser: { update: jest.fn().mockResolvedValue({}) },
+      auditEvent: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prisma = {
+      $transaction: jest.fn((callback: (client: any) => unknown) => callback(tx)),
+    } as unknown as PrismaService;
+    service = new AuthService(
+      prisma,
+      { signAsync: jest.fn() } as unknown as JwtService,
+      { get: jest.fn() } as unknown as ConfigService,
+    );
+  });
+
+  it('approves the provider, activates the account and records the audit event', async () => {
+    await expect(service.reviewProvider('provider-1', 'approved', 'admin-1')).resolves.toEqual({
+      userId: 'provider-1',
+      displayName: 'Profissional Teste',
+      approvalStatus: 'approved',
+      accountStatus: 'active',
+    });
+
+    expect(tx.providerProfile.update).toHaveBeenCalledWith({
+      where: { userId: 'provider-1' },
+      data: { approvalStatus: 'approved' },
+      select: { userId: true, displayName: true, approvalStatus: true },
+    });
+    expect(tx.appUser.update).toHaveBeenCalledWith({
+      where: { id: 'provider-1' },
+      data: { status: 'active' },
+    });
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: {
+        actorUserId: 'admin-1',
+        action: 'provider.approved',
+        entityType: 'provider_profile',
+        entityId: 'provider-1',
+        metadata: { previousApprovalStatus: 'pending', newApprovalStatus: 'approved' },
+      },
+    });
+  });
+
+  it('rejects the provider, blocks the account and records the decision', async () => {
+    await expect(service.reviewProvider('provider-1', 'rejected', 'admin-1')).resolves.toMatchObject({
+      approvalStatus: 'rejected',
+      accountStatus: 'blocked',
+    });
+
+    expect(tx.appUser.update).toHaveBeenCalledWith({
+      where: { id: 'provider-1' },
+      data: { status: 'blocked' },
+    });
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: 'admin-1',
+        action: 'provider.rejected',
+        entityType: 'provider_profile',
+        entityId: 'provider-1',
+      }),
+    });
+  });
+
+  it('does not change a blocked provider or create an audit event', async () => {
+    tx.providerProfile.findUnique.mockResolvedValue({
+      ...profile,
+      approvalStatus: 'blocked',
+    });
+
+    await expect(
+      service.reviewProvider('provider-1', 'approved', 'admin-1'),
+    ).rejects.toThrow('Prestador bloqueado não pode ser aprovado por este fluxo.');
+
+    expect(tx.providerProfile.update).not.toHaveBeenCalled();
+    expect(tx.appUser.update).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('returns an error when the provider profile does not exist', async () => {
+    tx.providerProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.reviewProvider('missing-provider', 'approved', 'admin-1'),
+    ).rejects.toThrow('Prestador não encontrado.');
+
+    expect(tx.providerProfile.update).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
+  });
+});
