@@ -114,6 +114,42 @@ describe('DocumentsService', () => {
     expect(storage.getFromQuarantine).not.toHaveBeenCalled();
   });
 
+  it('allows an administrator to inspect a clean document before reviewing it', async () => {
+    const stream = { pipe: jest.fn() };
+    prisma.providerDocument.findUnique.mockResolvedValue({
+      storageKey: 'quarantine/providers/provider-1/document-2',
+      originalFilename: 'certificado.pdf',
+      mimeType: 'application/pdf',
+      scanStatus: 'clean',
+    });
+    storage.getFromQuarantine.mockResolvedValue(stream);
+
+    const result = await service.downloadDocumentForAdmin('document-2');
+
+    expect(storage.getFromQuarantine).toHaveBeenCalledWith(
+      'quarantine/providers/provider-1/document-2',
+    );
+    expect(result).toEqual({
+      stream,
+      mimeType: 'application/pdf',
+      filename: 'certificado.pdf',
+    });
+  });
+
+  it('blocks administrator inspection when antivirus scan is not clean', async () => {
+    prisma.providerDocument.findUnique.mockResolvedValue({
+      storageKey: 'quarantine/providers/provider-1/document-2',
+      originalFilename: 'certificado.pdf',
+      mimeType: 'application/pdf',
+      scanStatus: 'pending',
+    });
+
+    await expect(
+      service.downloadDocumentForAdmin('document-2'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.getFromQuarantine).not.toHaveBeenCalled();
+  });
+
   it('requires a reason when rejecting a document', async () => {
     await expect(
       service.reviewDocument('document-1', 'admin-1', 'rejected'),
