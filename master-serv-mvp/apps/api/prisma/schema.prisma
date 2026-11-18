@@ -1,0 +1,45 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+model AppUser {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ email String? @unique
+ phone String? @unique
+ passwordHash String @map("password_hash")
+ status String @default("pending")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+ roles UserRole[]
+ provider ProviderProfile?
+ @@map("app_users")
+}
+model Role {
+ id Int @id @default(autoincrement()) @db.SmallInt
+ code String @unique
+ users UserRole[]
+ @@map("roles")
+}
+model UserRole {
+ userId String @map("user_id") @db.Uuid
+ roleId Int @map("role_id") @db.SmallInt
+ assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+ user AppUser @relation(fields:[userId], references:[id], onDelete:Cascade)
+ role Role @relation(fields:[roleId], references:[id])
+ @@id([userId,roleId])
+ @@map("user_roles")
+}
+model ProviderProfile {
+ userId String @id @map("user_id") @db.Uuid
+ displayName String @map("display_name")
+ approvalStatus String @default("pending") @map("approval_status")
+ bio String?
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ user AppUser @relation(fields:[userId], references:[id], onDelete:Cascade)
+ @@map("provider_profiles")
+}
+model ServiceCategory {
+ id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ name String @unique
+ active Boolean @default(true)
+ @@map("service_categories")
+}
