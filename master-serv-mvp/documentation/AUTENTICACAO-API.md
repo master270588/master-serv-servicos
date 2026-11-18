@@ -59,3 +59,14 @@ O workflow GitHub Actions em `.github/workflows/api-check.yml` executa validaç�
 - Proteção adicional contra abuso distribuído (rate limit compartilhado entre instâncias), monitoramento e alertas.
 - Política de recuperação de senha e verificação de e-mail/telefone.
 - Revisão de segurança independente e configuração de HTTPS/segredos no provedor de hospedagem.
+
+
+## Primeiro superadministrador
+
+O primeiro acesso administrativo não é criado pelo cadastro público. Para inicializar, em ambiente controlado com o banco configurado, use o script de uso único:
+
+```bash
+SUPER_ADMIN_EMAIL="admin@seudominio.com" SUPER_ADMIN_PASSWORD="uma-senha-aleatoria-com-16-ou-mais-caracteres" npm run admin:create
+```
+
+Use um segredo forte e exclusivo, fornecido por gerenciador de segredos; não coloque a senha no repositório, no histórico do terminal compartilhado ou em arquivos versionados. O script recusa e-mail já cadastrado, cria a conta ativa com papel `super_admin` e registra a operação na auditoria. Proteja a execução e remova as variáveis do ambiente após o uso.
