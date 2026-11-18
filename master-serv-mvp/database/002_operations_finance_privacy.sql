@@ -61,7 +61,7 @@ CREATE TABLE order_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES service_orders(id) ON DELETE CASCADE,
   provider_user_id UUID NOT NULL REFERENCES provider_profiles(user_id) ON DELETE RESTRICT,
-  assigned_by UUID REFERENCES app_users(id) ON DELETE RESTRICT,
+  assigned_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'assigned'
     CHECK (status IN ('assigned','accepted','declined','released','completed')),
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
