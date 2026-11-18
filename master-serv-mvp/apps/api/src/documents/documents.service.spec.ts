@@ -15,7 +15,7 @@ describe('DocumentsService', () => {
     $transaction: jest.fn(),
   };
 
-  const storage = { storeInQuarantine: jest.fn(), deleteFromQuarantine: jest.fn() };
+  const storage = { storeInQuarantine: jest.fn(), deleteFromQuarantine: jest.fn(), getFromQuarantine: jest.fn() };
   let service: DocumentsService;
 
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe('DocumentsService', () => {
       scanStatus: 'clean',
       reviewStatus: 'approved',
     });
-    storage.getFromQuarantine = jest.fn().mockResolvedValue(stream);
+    storage.getFromQuarantine.mockResolvedValue(stream);
 
     const result = await service.downloadOwnDocument('provider-1', 'document-1');
 
@@ -111,7 +111,7 @@ describe('DocumentsService', () => {
     await expect(
       service.downloadOwnDocument('provider-1', 'document-1'),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(storage.getFromQuarantine).toBeUndefined();
+    expect(storage.getFromQuarantine).not.toHaveBeenCalled();
   });
 
   it('requires a reason when rejecting a document', async () => {
