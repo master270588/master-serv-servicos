@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const FILE_SIGNATURES: Record<string, (buffer: Buffer) => boolean> = {
   'application/pdf': (buffer) => buffer.subarray(0, 5).toString('ascii') === '%PDF-',
@@ -79,6 +79,22 @@ export class R2QuarantineStorageService {
     }
 
     return { storageKey, sizeBytes: input.buffer.length };
+  }
+
+
+  async deleteFromQuarantine(storageKey: string): Promise<void> {
+    if (!storageKey.startsWith('quarantine/providers/')) {
+      throw new BadRequestException('Chave de armazenamento inválida.');
+    }
+    const bucket = this.config.get<string>('S3_BUCKET');
+    if (!bucket) {
+      throw new ServiceUnavailableException('Armazenamento de documentos não configurado.');
+    }
+    try {
+      await this.getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: storageKey }));
+    } catch {
+      throw new ServiceUnavailableException('Não foi possível remover o arquivo da quarentena.');
+    }
   }
 
   private getClient(): S3Client {
