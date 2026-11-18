@@ -29,8 +29,20 @@ Definir os controles mínimos antes de receber documentos de identidade, comprov
 
 **Conclusão:** o módulo inicial de consulta de metadados e revisão administrativa foi criado, mas o ciclo seguro de arquivos ainda não está pronto para uso real. Não solicitar documentos reais nem habilitar upload em produção nesta etapa.
 
-## Requisitos obrigatórios para a implementação
+## Decisão de armazenamento
+A opção técnica selecionada para a próxima implementação é **Cloudflare R2 usando a API compatível com S3**.
 
+Configuração prevista:
+- Bucket privado, sem domínio público ou acesso anônimo.
+- Endpoint da conta R2, região `auto` e credenciais de API com permissões mínimas restritas ao bucket da aplicação.
+- Objetos inicialmente enviados para uma área/prefixo de quarentena; só depois de varredura antimalware bem-sucedida poderão ser disponibilizados para download.
+- Chaves de objeto aleatórias geradas no servidor. O nome original será mantido somente como metadado sanitizado.
+- Segredos fornecidos por variáveis de ambiente ou gerenciador de segredos do ambiente de execução; nunca armazenados no GitHub, código-fonte, mensagens ou logs.
+- Limite inicial planejado de 10 MiB por arquivo, sujeito a revisão dos tipos documentais aceitos.
+
+As variáveis de configuração de referência estão em `apps/api/.env.example`. São apenas nomes e valores ilustrativos: a integração ainda não foi conectada, as credenciais não foram criadas e o bucket não foi provisionado.
+
+## Requisitos obrigatórios para a implementação
 1. **Armazenamento privado:** bucket/container sem acesso público; bloquear listagem pública e servir arquivos apenas pela API autorizada ou URL assinada de curta duração.
 2. **Upload controlado:** autenticar o usuário; permitir somente tipos documentais definidos; impor limite de tamanho; validar extensão, MIME declarado e assinatura/conteúdo real; gerar nome/chave aleatória no servidor; nunca confiar em caminho ou nome enviado pelo navegador.
 3. **Quarentena e análise:** manter o arquivo indisponível até concluir varredura antimalware; impedir download quando a análise não for aprovada.
@@ -43,10 +55,12 @@ Definir os controles mínimos antes de receber documentos de identidade, comprov
 10. **Testes:** cobrir acesso cruzado entre prestadores, papel administrativo insuficiente, arquivo inválido/excessivo, malware, URL expirada, chave inexistente e falha do storage.
 
 ## Sequência de entrega
-- [ ] Escolher provedor de armazenamento privado e definir região, criptografia, retenção e credenciais.
+- [x] Selecionar Cloudflare R2 como alvo de armazenamento privado compatível com S3.
 - [x] Criar rotas autenticadas de consulta de metadados e revisão administrativa.
 - [x] Registrar auditoria de aprovação/rejeição de documentos na mesma transação.
+- [ ] Provisionar bucket privado e credenciais com privilégio mínimo.
 - [ ] Implementar upload em quarentena e download autorizado.
+- [ ] Integrar varredura antimalware e fluxo de liberação.
 - [ ] Implementar consentimentos e política de retenção.
 - [ ] Adicionar testes de integração com PostgreSQL e storage de teste.
 - [ ] Executar revisão de segurança antes de habilitar dados reais.
