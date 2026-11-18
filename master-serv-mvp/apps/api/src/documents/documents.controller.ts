@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   Controller,
+  StreamableFile,
+  Res,
   Get,
   Post,
   UploadedFile,
@@ -19,6 +21,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/guards/roles.decorator';
 import { DocumentsService } from './documents.service';
 import { ReviewDocumentDto } from './dto/review-document.dto';
+import type { Response } from 'express';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -44,6 +47,23 @@ export class DocumentsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.documents.uploadOwnDocument(request.user.sub, file, documentType);
+  }
+
+  @Get('providers/me/documents/:documentId/file')
+  @UseGuards(RolesGuard)
+  @Roles('provider')
+  async downloadOwn(
+    @Param('documentId', new ParseUUIDPipe()) documentId: string,
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const document = await this.documents.downloadOwnDocument(request.user.sub, documentId);
+    const safeFilename = document.filename.replace(/[\\"\r\n]/g, '_');
+    response.setHeader('Content-Type', document.mimeType);
+    response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(safeFilename)}`);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(document.stream);
   }
 
   @Get('providers/me/documents')
