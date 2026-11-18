@@ -77,11 +77,19 @@ export class AuthService {
         });
         return created;
       });
+      const accountStatus = dto.accountType === 'provider' ? 'pending_approval' : 'active';
+      if (dto.accountType === 'provider') {
+        return {
+          user: { id: user.id, email: user.email, phone: user.phone, roles: user.roles.map((r) => r.role.code) },
+          accountStatus,
+          message: 'Cadastro recebido. O acesso será liberado após aprovação administrativa.',
+        };
+      }
       const tokens = await this.issueTokens(user);
       return {
         user: { id: user.id, email: user.email, phone: user.phone, roles: user.roles.map((r) => r.role.code) },
         ...tokens,
-        accountStatus: dto.accountType === 'provider' ? 'pending_approval' : 'active',
+        accountStatus,
       };
     } catch (error) {
       if (error instanceof ConflictException || error instanceof BadRequestException || error instanceof InternalServerErrorException) throw error;
