@@ -22,6 +22,20 @@ on:
 jobs:
   validate-and-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: master_serv_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d master_serv_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: master-serv-mvp/apps/api
@@ -45,6 +59,20 @@ jobs:
           node -e "const a=require('./npm-audit-production.json'); const v=a.vulnerabilities||{}; console.log('PRODUCTION DEPENDENCIES:', JSON.stringify({summary:a.metadata?.vulnerabilities, packages:Object.entries(v).map(([name,item])=>({name,severity:item.severity,fixAvailable:item.fixAvailable,advisories:(item.via||[]).map(x=>typeof x==='string'?x:x.title)}))},null,2))"
       - name: Validate Prisma schema
         run: npx prisma validate
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Apply SQL migrations to disposable CI database
+        working-directory: master-serv-mvp
+        env:
+          PGPASSWORD: ci
+        run: |
+          for file in database/00*.sql; do
+            psql -h localhost -U ci -d master_serv_ci -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Verify SQL migrations match Prisma schema
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
       - name: Run unit tests
         run: npm test -- --runInBand
       - name: Type-check document scanner worker
