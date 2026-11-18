@@ -133,16 +133,30 @@ export class AuthService {
       throw new InternalServerErrorException('Autenticação não configurada no servidor.');
     }
 
-    // Prepare the replacement credentials before consuming the current session.
-    const accessToken = await this.jwt.signAsync({
-      sub: session.user.id,
-      roles: session.user.roles.map((item) => item.role.code),
-    });
+    // Prepare a replacement session atomically using the account's current status and roles.
     const refreshToken = randomBytes(48).toString('base64url');
     const refreshTokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000);
+    let accessToken = '';
 
     await this.prisma.$transaction(async (tx) => {
+      const currentUser = await tx.appUser.findUnique({
+        where: { id: session.user.id },
+        select: {
+          id: true,
+          status: true,
+          roles: { select: { role: { select: { code: true } } } },
+        },
+      });
+      if (!currentUser || currentUser.status !== 'active') {
+        throw new UnauthorizedException('Sessão inválida ou expirada.');
+      }
+
+      accessToken = await this.jwt.signAsync({
+        sub: currentUser.id,
+        roles: currentUser.roles.map((item) => item.role.code),
+      });
+
       const result = await tx.authSession.updateMany({
         where: { id: session.id, revokedAt: null, expiresAt: { gt: new Date() } },
         data: { revokedAt: new Date() },
@@ -153,7 +167,7 @@ export class AuthService {
 
       await tx.authSession.create({
         data: {
-          userId: session.user.id,
+          userId: currentUser.id,
           refreshTokenHash,
           expiresAt,
         },
