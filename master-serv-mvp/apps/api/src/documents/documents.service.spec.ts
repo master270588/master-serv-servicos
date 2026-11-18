@@ -225,4 +225,58 @@ describe('DocumentsService', () => {
     expect(tx.providerDocument.updateMany).not.toHaveBeenCalled();
     expect(tx.auditEvent.create).not.toHaveBeenCalled();
   });
+
+  it('rejects an unsupported document type before accessing provider data', async () => {
+    await expect(
+      service.uploadOwnDocument('provider-1', {
+        buffer: Buffer.from('%PDF-123'),
+        mimetype: 'application/pdf',
+        originalname: 'id.pdf',
+      }, 'passport'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.providerProfile.findUnique).not.toHaveBeenCalled();
+    expect(storage.storeInQuarantine).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing upload before accessing provider data', async () => {
+    await expect(
+      service.uploadOwnDocument('provider-1', undefined as any, 'identity'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.providerProfile.findUnique).not.toHaveBeenCalled();
+    expect(storage.storeInQuarantine).not.toHaveBeenCalled();
+  });
+
+  it('does not store a document when the authenticated user has no provider profile', async () => {
+    prisma.providerProfile.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.uploadOwnDocument('provider-1', {
+        buffer: Buffer.from('%PDF-123'),
+        mimetype: 'application/pdf',
+        originalname: 'id.pdf',
+      }, 'identity'),
+    ).rejects.toThrow('Perfil de prestador não encontrado.');
+
+    expect(storage.storeInQuarantine).not.toHaveBeenCalled();
+    expect(prisma.providerDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create database metadata when quarantine storage fails', async () => {
+    prisma.providerProfile.findUnique.mockResolvedValue({ userId: 'provider-1' });
+    storage.storeInQuarantine.mockRejectedValue(new Error('storage unavailable'));
+
+    await expect(
+      service.uploadOwnDocument('provider-1', {
+        buffer: Buffer.from('%PDF-123'),
+        mimetype: 'application/pdf',
+        originalname: 'id.pdf',
+      }, 'identity'),
+    ).rejects.toThrow('storage unavailable');
+
+    expect(prisma.providerDocument.create).not.toHaveBeenCalled();
+    expect(storage.deleteFromQuarantine).not.toHaveBeenCalled();
+  });
+
 });
