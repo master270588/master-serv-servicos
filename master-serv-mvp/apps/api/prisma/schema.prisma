@@ -174,6 +174,7 @@ model ProviderDocument {
   mimeType         String          @map("mime_type")
   sizeBytes        BigInt          @map("size_bytes")
   reviewStatus     String          @default("pending") @map("review_status")
+  scanStatus       String          @default("pending") @map("scan_status")
   expiresAt        DateTime?       @map("expires_at") @db.Date
   reviewedBy       String?         @map("reviewed_by") @db.Uuid
   reviewedAt       DateTime?       @map("reviewed_at") @db.Timestamptz
