@@ -14,6 +14,9 @@ on:
     paths:
       - "master-serv-mvp/apps/api/**"
       - "master-serv-mvp/database/**"
+      - "master-serv-mvp/docker-compose.yml"
+      - "master-serv-mvp/.env.example"
+      - "master-serv-mvp/README.md"
       - ".github/workflows/api-check.yml"
 
 jobs:
