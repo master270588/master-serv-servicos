@@ -42,7 +42,7 @@ async function scanStreamWithClamAv(body: AsyncIterable<Uint8Array>): Promise<'c
     socket.once('timeout', () => reject(new Error('ClamAV scan timed out')));
     socket.on('data', (data: Buffer) => {
       response += data.toString('utf8');
-      if (response.includes('\\0')) resolve(response);
+      if (response.includes('\0')) resolve(response);
     });
   });
 
@@ -52,7 +52,7 @@ async function scanStreamWithClamAv(body: AsyncIterable<Uint8Array>): Promise<'c
   });
 
   try {
-    socket.write(Buffer.from('zINSTREAM\\0', 'ascii'));
+    socket.write(Buffer.from('zINSTREAM\0', 'ascii'));
     for await (const part of body) {
       const chunk = Buffer.from(part);
       if (chunk.length) await writeChunk(socket, chunk);
@@ -93,7 +93,7 @@ async function main(): Promise<void> {
       result = await scanStreamWithClamAv(object.Body as AsyncIterable<Uint8Array>);
     } catch (error) {
       // Fail closed: scanner/storage errors never result in a clean status.
-      process.stderr.write(`Document ${document.id} scan failed: ${error instanceof Error ? error.message : 'unknown error'}\\n`);
+      process.stderr.write(`Document ${document.id} scan failed: ${error instanceof Error ? error.message : 'unknown error'}\n`);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -118,12 +118,12 @@ async function main(): Promise<void> {
     });
   }
 
-  process.stdout.write(`Scanned ${pending.length} pending document(s).\\n`);
+  process.stdout.write(`Scanned ${pending.length} pending document(s).\n`);
 }
 
 main()
   .catch((error) => {
-    process.stderr.write(`Document scan worker failed: ${error instanceof Error ? error.message : 'unknown error'}\\n`);
+    process.stderr.write(`Document scan worker failed: ${error instanceof Error ? error.message : 'unknown error'}\n`);
     process.exitCode = 1;
   })
   .finally(async () => {
