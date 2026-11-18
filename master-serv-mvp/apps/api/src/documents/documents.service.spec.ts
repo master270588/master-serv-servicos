@@ -45,7 +45,7 @@ describe('DocumentsService', () => {
     });
     const result = await service.uploadOwnDocument('provider-1', {
       buffer: Buffer.from('%PDF-123'), mimetype: 'application/pdf', originalname: 'id.pdf',
-    } as Express.Multer.File, 'identity');
+    } as { buffer: Buffer; mimetype: string; originalname: string }, 'identity');
     expect(storage.storeInQuarantine).toHaveBeenCalledWith(expect.objectContaining({ providerUserId: 'provider-1' }));
     expect(prisma.providerDocument.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ storageKey: 'quarantine/providers/provider-1/random', scanStatus: 'pending', reviewStatus: 'pending' }),
