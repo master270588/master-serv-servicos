@@ -21,9 +21,9 @@ Este repositório contém a API inicial e a infraestrutura de desenvolvimento da
 
 Na raiz de `master-serv-mvp`:
 
-1. Copie `.env.example` para `.env` e defina uma senha local forte para o PostgreSQL.
+1. Copie `.env.example` para `.env`, defina uma senha local forte para o PostgreSQL e ajuste `DATABASE_URL_DOCKER` com a mesma senha (codifique caracteres especiais para uso em URL).
 2. Copie `apps/api/.env.example` para `apps/api/.env`.
-3. No arquivo `apps/api/.env`, use uma URL local do PostgreSQL, um segredo JWT aleatório com pelo menos 32 caracteres e `CLAMAV_HOST=127.0.0.1` / `CLAMAV_PORT=3310` quando executar a API diretamente no computador.
+3. No arquivo `apps/api/.env`, defina um segredo JWT aleatório com pelo menos 32 caracteres. Para executar a API diretamente no computador, use PostgreSQL em `localhost` e `CLAMAV_HOST=127.0.0.1` / `CLAMAV_PORT=3310`. Para executar no Compose, a URL interna do banco será fornecida por `DATABASE_URL_DOCKER` e o host do ClamAV será `clamav`.
 4. Inicie os serviços locais:
 
 ```bash
@@ -31,7 +31,7 @@ docker compose up -d postgres clamav
 docker compose ps
 ```
 
-O PostgreSQL e o ClamAV são publicados somente em `127.0.0.1` neste Compose de desenvolvimento. O ClamAV pode levar alguns minutos na primeira inicialização para baixar as definições de vírus.
+O PostgreSQL e o ClamAV são publicados somente em `127.0.0.1` neste Compose de desenvolvimento. O ClamAV pode levar alguns minutos na primeira inicialização para baixar as definições de vírus. A API possui imagem Docker própria e fica desativada por padrão até que o banco seja migrado.
 
 Para instalar e validar a API:
 
@@ -54,7 +54,15 @@ O modelo Prisma está em `apps/api/prisma/schema.prisma`. A sequência SQL versi
 4. `004_audit_indexes.sql`
 5. `005_provider_document_scan_status.sql`
 
-Leia `database/README.md` antes de aplicar. Faça isso primeiro em banco descartável/de desenvolvimento, compare o esquema SQL com Prisma e valide as relações. Não execute em produção sem backup testado, revisão e plano de rollback. Não misture essa sequência SQL com uma segunda sequência Prisma Migrate sem planejar a transição.
+Leia `database/README.md` antes de aplicar. Faça isso primeiro em banco descartável/de desenvolvimento. Com o PostgreSQL local iniciado, aplique a sequência a partir da raiz `master-serv-mvp` (ambiente de desenvolvimento apenas):
+
+```bash
+for file in database/00*.sql; do
+  docker exec -i master-serv-postgres psql -v ON_ERROR_STOP=1 -U master_serv_dev -d master_serv < "$file"
+done
+```
+
+Depois de revisar a estrutura e preparar `apps/api/.env`, inicie a API containerizada com `docker compose --profile app up -d --build api`. Verifique `http://127.0.0.1:3000/api/health`. Faça isso primeiro em banco descartável/de desenvolvimento, compare o esquema SQL com Prisma e valide as relações. Não execute em produção sem backup testado, revisão e plano de rollback. Não misture essa sequência SQL com uma segunda sequência Prisma Migrate sem planejar a transição.
 
 ## Configuração de armazenamento e análise de documentos
 
