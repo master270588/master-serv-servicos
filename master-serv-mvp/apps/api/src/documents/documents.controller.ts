@@ -1,6 +1,9 @@
 import {
   Controller,
   Get,
+  Post,
+  UploadedFile,
+  UseInterceptors,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -8,6 +11,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { AuthenticatedRequest } from '../auth/guards/jwt-auth.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -19,6 +23,18 @@ import { ReviewDocumentDto } from './dto/review-document.dto';
 @UseGuards(JwtAuthGuard)
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
+
+  @Post('providers/me/documents')
+  @UseGuards(RolesGuard)
+  @Roles('provider')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
+  uploadOwn(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('documentType') documentType: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.documents.uploadOwnDocument(request.user.sub, file, documentType);
+  }
 
   @Get('providers/me/documents')
   listOwn(@Req() request: AuthenticatedRequest) {
