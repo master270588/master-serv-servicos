@@ -20,12 +20,10 @@ export class RolesGuard implements CanActivate {
       where: { userId: request.user.sub },
       select: { role: { select: { code: true } } },
     });
-    {
-      const currentRoles = assignments.map((item) => item.role.code);
-      const allowed = required.some((role) => currentRoles.includes(role));
-      if (!allowed) throw new ForbiddenException('Você não tem permissão para esta operação.');
-      request.user.roles = currentRoles;
-      return true;
-    });
+    const currentRoles = assignments.map((item) => item.role.code);
+    const allowed = required.some((role) => currentRoles.includes(role));
+    if (!allowed) throw new ForbiddenException('Você não tem permissão para esta operação.');
+    request.user.roles = currentRoles;
+    return true;
   }
 }
