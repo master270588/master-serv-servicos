@@ -15,7 +15,8 @@
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:studio": "prisma studio",
-    "admin:create": "ts-node -r tsconfig-paths/register scripts/create-super-admin.ts"
+    "admin:create": "ts-node -r tsconfig-paths/register scripts/create-super-admin.ts",
+    "documents:scan": "ts-node -r tsconfig-paths/register scripts/scan-pending-documents.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
