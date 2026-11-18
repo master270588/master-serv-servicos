@@ -1,5 +1,11 @@
 import {
   BadRequestException,
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+  Observable,
+  PayloadTooLargeException,
   Controller,
   StreamableFile,
   Res,
@@ -23,6 +29,40 @@ import { DocumentsService } from './documents.service';
 import { ReviewDocumentDto } from './dto/review-document.dto';
 import type { Response } from 'express';
 
+const MulterDocumentInterceptor = FileInterceptor('file', {
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_request, file, callback) => {
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return callback(new BadRequestException('Formato não permitido. Envie PDF, JPEG ou PNG.'), false);
+    }
+    callback(null, true);
+  },
+});
+
+@Injectable()
+class ProviderDocumentUploadInterceptor implements NestInterceptor {
+  private readonly delegate = new MulterDocumentInterceptor();
+
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
+    try {
+      return await this.delegate.intercept(context, next);
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+
+      if (code === 'LIMIT_FILE_SIZE') {
+        throw new PayloadTooLargeException('O arquivo excede o limite de 10 MiB.');
+      }
+      if (typeof code === 'string' && code.startsWith('LIMIT_')) {
+        throw new BadRequestException('O envio contém campos ou arquivos acima dos limites permitidos.');
+      }
+      throw error;
+    }
+  }
+}
+
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class DocumentsController {
@@ -31,16 +71,7 @@ export class DocumentsController {
   @Post('providers/me/documents')
   @UseGuards(RolesGuard)
   @Roles('provider')
-  @UseInterceptors(FileInterceptor('file', {
-    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
-    fileFilter: (_request, file, callback) => {
-      const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        return callback(new BadRequestException('Formato não permitido. Envie PDF, JPEG ou PNG.'), false);
-      }
-      callback(null, true);
-    },
-  }))
+  @UseInterceptors(ProviderDocumentUploadInterceptor)
   uploadOwn(
     @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname: string },
     @Body('documentType') documentType: string,
