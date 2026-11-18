@@ -104,7 +104,7 @@ model ServiceOrder {
   assignments   OrderAssignment[]
   payments      PaymentTransaction[]
   ledgerEntries FinancialLedgerEntry[]
-  commission    CommissionRecord?
+  commissions   CommissionRecord[]
   loyaltyEntries LoyaltyLedger[]
 
   @@index([customerUserId, createdAt(sort: Desc)], map: "idx_orders_customer_created")
@@ -269,7 +269,7 @@ model FinancialLedgerEntry {
 
 model CommissionRecord {
   id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId               String              @unique @map("order_id") @db.Uuid
+  orderId               String              @map("order_id") @db.Uuid
   paymentTransactionId  String?             @unique @map("payment_transaction_id") @db.Uuid
   grossAmountCents      BigInt              @map("gross_amount_cents")
   rateBasisPoints       Int                 @default(1000) @map("rate_basis_points")
