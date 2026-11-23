@@ -60,6 +60,20 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
     try {
       const user = await this.prisma.$transaction(async (tx) => {
+        let providerCategoryIds: string[] = [];
+        if (dto.accountType === 'provider') {
+          if (!dto.serviceCategoryIds?.length) {
+            throw new BadRequestException('Selecione ao menos uma categoria de serviço.');
+          }
+          const categories = await tx.serviceCategory.findMany({
+            where: { id: { in: dto.serviceCategoryIds }, active: true },
+            select: { id: true },
+          });
+          if (categories.length !== dto.serviceCategoryIds.length) {
+            throw new BadRequestException('Uma ou mais categorias selecionadas não estão disponíveis.');
+          }
+          providerCategoryIds = categories.map((category) => category.id);
+        }
         const role = await tx.role.findUnique({ where: { code: dto.accountType } });
         if (!role) throw new InternalServerErrorException('Papel de usuário não configurado.');
         const created = await tx.appUser.create({
@@ -70,7 +84,11 @@ export class AuthService {
             status: dto.accountType === 'customer' ? 'active' : 'pending',
             roles: { create: { roleId: role.id } },
             ...(dto.accountType === 'provider'
-              ? { provider: { create: { displayName: dto.displayName!.trim(), approvalStatus: 'pending' } } }
+              ? { provider: { create: {
+                  displayName: dto.displayName!.trim(),
+                  approvalStatus: 'pending',
+                  services: { create: providerCategoryIds.map((categoryId) => ({ categoryId })) },
+                } } }
               : {}),
           },
           select: { id: true, email: true, phone: true, roles: { select: { role: { select: { code: true } } } } },
