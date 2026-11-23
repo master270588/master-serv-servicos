@@ -491,6 +491,13 @@ export class OrdersService {
       if (alreadyAssigned.length > 0) {
         throw new ConflictException('Remova ou encerre as atribuições ativas antes de distribuir novamente aos mesmos prestadores.');
       }
+      const providersWithPreviousQuotes = await tx.quote.findMany({
+        where: { orderId, providerUserId: { in: dto.providerUserIds } },
+        select: { providerUserId: true },
+      });
+      if (providersWithPreviousQuotes.length > 0) {
+        throw new BadRequestException('Não redistribua o chamado a prestadores que já enviaram orçamento; selecione outros prestadores.');
+      }
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       const batch = await tx.dispatchBatch.create({
         data: {
