@@ -38,7 +38,7 @@ export class OrdersService {
         data: {
           customerUserId,
           label: dto.label?.trim() || null,
-          postalCode: dto.postalCode.replace(/\\D/g, ''),
+          postalCode: dto.postalCode.replace(/\D/g, ''),
           street: dto.street.trim(),
           number: dto.number.trim(),
           complement: dto.complement?.trim() || null,
