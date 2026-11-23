@@ -112,6 +112,7 @@ model ServiceOrder {
 
   @@index([customerUserId, createdAt(sort: Desc)], map: "idx_orders_customer_created")
   @@index([status, createdAt], map: "idx_orders_status_created")
+  @@index([customerAddressId], map: "idx_service_orders_customer_address")
   @@map("service_orders")
 }
 
