@@ -245,10 +245,33 @@ export class AuthService {
   async getProfile(userId: string) {
     const user = await this.prisma.appUser.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, phone: true, status: true, roles: { select: { role: { select: { code: true } } } } },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        status: true,
+        roles: { select: { role: { select: { code: true } } } },
+        provider: {
+          select: {
+            displayName: true,
+            approvalStatus: true,
+            services: { select: { category: { select: { id: true, name: true } } } },
+          },
+        },
+      },
     });
     if (!user || user.status !== 'active') throw new UnauthorizedException('Conta indisponível.');
-    return { id: user.id, email: user.email, phone: user.phone, roles: user.roles.map((item) => item.role.code) };
+    return {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      roles: user.roles.map((item) => item.role.code),
+      provider: user.provider ? {
+        displayName: user.provider.displayName,
+        approvalStatus: user.provider.approvalStatus,
+        services: user.provider.services.map((item) => item.category),
+      } : null,
+    };
   }
 
   async logout(rawToken: string) {
