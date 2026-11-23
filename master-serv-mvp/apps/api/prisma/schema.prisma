@@ -99,6 +99,9 @@ model ServiceOrder {
   updatedAt      DateTime               @default(now()) @map("updated_at") @db.Timestamptz
   customer       AppUser                @relation("OrderCustomer", fields: [customerUserId], references: [id])
   category       ServiceCategory        @relation(fields: [categoryId], references: [id])
+  customerAddressId String?             @map("customer_address_id") @db.Uuid
+  stateCode      String                 @default("ES") @map("state_code") @db.Char(2)
+  customerAddress CustomerAddress?      @relation(fields: [customerAddressId], references: [id], onDelete: Restrict)
   quotes         Quote[]
   dispatchBatches DispatchBatch[]
   assignments   OrderAssignment[]
@@ -124,6 +127,7 @@ model Quote {
   provider        ProviderProfile @relation(fields: [providerUserId], references: [userId])
 
   @@index([orderId, status], map: "idx_quotes_order_status")
+  @@unique([orderId, providerUserId], map: "uq_quotes_order_provider")
   @@map("quotes")
 }
 
@@ -160,6 +164,7 @@ model CustomerAddress {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
   customer       AppUser  @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  serviceOrders  ServiceOrder[]
 
   @@index([customerUserId], map: "idx_customer_addresses_owner")
   @@map("customer_addresses")
@@ -350,4 +355,17 @@ model AuthSession {
   @@index([userId, revokedAt], map: "idx_auth_sessions_user_revoked")
   @@index([expiresAt], map: "idx_auth_sessions_expires")
   @@map("auth_sessions")
+}
+
+
+model ServiceArea {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  city         String
+  stateCode    String   @default("ES") @map("state_code") @db.Char(2)
+  active       Boolean  @default(true)
+  rolloutPhase String   @default("initial") @map("rollout_phase")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([city, stateCode], map: "uq_service_areas_city_state")
+  @@map("service_areas")
 }
