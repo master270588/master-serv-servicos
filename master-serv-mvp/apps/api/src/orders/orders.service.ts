@@ -7,6 +7,7 @@ import { DispatchOrderDto } from './dto/dispatch-order.dto';
 import { RespondDispatchDto } from './dto/respond-dispatch.dto';
 import { SubmitQuoteDto } from './dto/submit-quote.dto';
 import { DecideQuoteDto } from './dto/decide-quote.dto';
+import { CreateAddressDto } from './dto/create-address.dto';
 
 const ORDER_STATUSES = [
   'requested','dispatching','quoted','awaiting_customer_approval',
@@ -28,6 +29,51 @@ export class OrdersService {
       where: { active: true },
       select: { city: true, stateCode: true, rolloutPhase: true },
       orderBy: { city: 'asc' },
+    });
+  }
+
+  async createCustomerAddress(customerUserId: string, dto: CreateAddressDto) {
+    const address = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.customerAddress.create({
+        data: {
+          customerUserId,
+          label: dto.label?.trim() || null,
+          postalCode: dto.postalCode.replace(/\\D/g, ''),
+          street: dto.street.trim(),
+          number: dto.number.trim(),
+          complement: dto.complement?.trim() || null,
+          neighborhood: dto.neighborhood.trim(),
+          city: dto.city.trim(),
+          stateCode: dto.stateCode,
+          referenceNote: dto.referenceNote?.trim() || null,
+        },
+        select: {
+          id: true, label: true, postalCode: true, street: true, number: true,
+          complement: true, neighborhood: true, city: true, stateCode: true, createdAt: true,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorUserId: customerUserId,
+          action: 'customer_address.created',
+          entityType: 'customer_address',
+          entityId: created.id,
+          metadata: { city: created.city, stateCode: created.stateCode },
+        },
+      });
+      return created;
+    });
+    return address;
+  }
+
+  listCustomerAddresses(customerUserId: string) {
+    return this.prisma.customerAddress.findMany({
+      where: { customerUserId },
+      select: {
+        id: true, label: true, postalCode: true, street: true, number: true,
+        complement: true, neighborhood: true, city: true, stateCode: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
