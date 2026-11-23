@@ -367,6 +367,10 @@ export class OrdersService {
           data: { status: 'rejected', customerDecidedAt: now },
         });
         if (quoteChanged.count !== 1) throw new ConflictException('O orçamento já recebeu outra decisão.');
+        await tx.orderAssignment.updateMany({
+          where: { orderId, providerUserId: quote.providerUserId, status: { in: ['assigned', 'accepted'] } },
+          data: { status: 'released', endedAt: now },
+        });
         const remaining = await tx.quote.count({ where: { orderId, status: 'submitted' } });
         const orderChanged = await tx.serviceOrder.updateMany({
           where: { id: orderId, customerUserId, status: 'awaiting_customer_approval' },
@@ -475,6 +479,17 @@ export class OrdersService {
       });
       if (eligible.length !== dto.providerUserIds.length) {
         throw new BadRequestException('Todos os prestadores devem estar aprovados, ativos e habilitados na categoria.');
+      }
+      const alreadyAssigned = await tx.orderAssignment.findMany({
+        where: {
+          orderId,
+          providerUserId: { in: dto.providerUserIds },
+          status: { in: ['assigned', 'accepted'] },
+        },
+        select: { providerUserId: true },
+      });
+      if (alreadyAssigned.length > 0) {
+        throw new ConflictException('Remova ou encerre as atribuições ativas antes de distribuir novamente aos mesmos prestadores.');
       }
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       const batch = await tx.dispatchBatch.create({
