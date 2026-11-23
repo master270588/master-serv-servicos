@@ -29,8 +29,7 @@ ALTER TABLE service_orders
   ADD COLUMN state_code CHAR(2) NOT NULL DEFAULT 'ES';
 
 ALTER TABLE service_orders
-  ADD CONSTRAINT fk_service_orders_customer_address
-  FOREIGN KEY (customer_address_id) REFERENCES customer_addresses(id)
+  ADD FOREIGN KEY (customer_address_id) REFERENCES customer_addresses(id)
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 CREATE INDEX idx_service_orders_customer_address
