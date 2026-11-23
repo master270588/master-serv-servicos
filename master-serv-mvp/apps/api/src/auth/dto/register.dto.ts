@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsEmail, IsIn, IsOptional, IsString, IsUUID, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class RegisterDto {
   @IsOptional()
@@ -23,4 +23,12 @@ export class RegisterDto {
   @IsString()
   @MaxLength(120)
   displayName?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  serviceCategoryIds?: string[];
 }
