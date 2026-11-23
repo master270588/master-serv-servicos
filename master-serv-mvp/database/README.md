@@ -1,42 +1,41 @@
-# Banco de dados — MASTER SERV SERVIÇOS
+# Banco de dados MASTER SERV
 
-## Fonte do modelo
+As migrações SQL são a fonte versionada do esquema PostgreSQL. Aplicar em ordem, uma única vez por ambiente, usando banco descartável primeiro:
 
-O modelo de dados da API está em `apps/api/prisma/schema.prisma`. Ele representa as tabelas operacionais criadas pelas migrações SQL deste diretório, incluindo usuários, prestadores, chamados, orçamentos, distribuição, pagamentos, financeiro, comissões, fidelidade, consentimentos LGPD, notificações e sessões.
+1. 001 — usuários, papéis, categorias, chamados, orçamentos e auditoria.
+2. 002 — endereços, documentos, distribuição, atribuições, pagamentos, ledger, comissão, fidelidade, consentimentos e notificações.
+3. 003 — sessões e refresh tokens em hash.
+4. 004 — índices de auditoria.
+5. 005 — estado de análise antimalware de documentos.
+6. 006 — áreas de atendimento, categorias iniciais, vínculo do endereço ao chamado e restrições de distribuição/orçamentos.
 
-As migrações SQL são a sequência de criação/evolução do banco. O Prisma Client é gerado a partir do schema; não execute `prisma migrate dev` para criar uma segunda sequência concorrente sem uma decisão explícita de migração.
+A migração 006 cadastra a cobertura inicial da Grande Vitória: Vitória, Vila Velha, Serra, Cariacica, Viana, Guarapari e Fundão. A expansão para outros municípios do Espírito Santo deve ocorrer ativando/cadastrando áreas após decisão operacional; não significa cobertura já disponível.
 
-## Ordem das migrações
+## Aplicação local (desenvolvimento)
 
-1. `001_initial_schema.sql`
-2. `002_operations_finance_privacy.sql`
-3. `003_auth_sessions.sql`
-4. `004_audit_indexes.sql`
-5. `005_provider_document_scan_status.sql`
+A partir da pasta `master-serv-mvp`, com o PostgreSQL local iniciado:
 
-Execute e valide primeiro em um banco PostgreSQL descartável/de desenvolvimento. As migrações devem ser aplicadas uma única vez e na ordem indicada. As migrações 004 e 005 usam `IF NOT EXISTS` para permitir repetição segura dos índices/coluna. A 005 separa o status da análise administrativa (`review_status`) do estado da verificação antivírus (`scan_status`).
+```bash
+for file in database/00*.sql; do
+  docker exec -i master-serv-postgres psql -v ON_ERROR_STOP=1 -U master_serv_dev -d master_serv < "$file"
+done
+```
 
-## Validação do modelo
-
-A partir de `apps/api`, configure `DATABASE_URL` apontando para o PostgreSQL de desenvolvimento e execute:
+Depois execute na pasta `apps/api`:
 
 ```bash
 npx prisma validate
 npx prisma generate
+npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+npm test -- --runInBand
+npm run build
 ```
 
-Para comparar o modelo Prisma com um banco já migrado, use uma conexão de desenvolvimento e revise o resultado de:
+Não aplicar diretamente em produção sem backup restaurável, janela de manutenção, revisão do diff e plano de rollback. Não misturar SQL versionado e Prisma Migrate sem planejar formalmente a transferência de baseline.
 
-```bash
-npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma
-```
+## Regras comerciais codificadas como premissas
 
-A saída deve ser revisada: diferenças podem indicar drift entre SQL e Prisma. Não aplique automaticamente alterações sugeridas em produção.
-
-## Segurança e produção
-
-- Não coloque credenciais, tokens ou arquivos de documentos no Git.
-- Faça backup testado antes de qualquer alteração em ambiente real.
-- Não execute estas migrações em produção sem revisão, janela de manutenção e plano de rollback.
-- Documentos de prestadores devem ficar em armazenamento privado; o banco guarda apenas metadados e a chave interna do objeto.
-- Pagamentos, comissões e pontos exigem transações e chaves de idempotência.
+- A comissão padrão permanece 10% (1.000 pontos-base); cálculo e liquidação dependem do módulo financeiro/gateway.
+- Pontos: regra aprovada de 1 ponto por R$ 1 elegível e 1.000 pontos = R$ 10 de desconto; ainda exige regras de elegibilidade, estorno e limite de uso.
+- Garantia comercial proposta de 90 dias não substitui nem reduz direitos legais do consumidor.
+- Orçamento precisa estar aprovado pelo cliente antes de o prestador iniciar. A API bloqueia a transição para `in_progress` sem orçamento aprovado.
