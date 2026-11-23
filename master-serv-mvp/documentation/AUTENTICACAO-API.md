@@ -1,72 +1,54 @@
 # Autenticação da API — MASTER SERV SERVIÇOS
 
-## Rotas implementadas
-
 Todas as rotas usam o prefixo global `/api`.
 
-| Método | Rota | Acesso | Descrição |
-|---|---|---|---|
-| POST | `/auth/register` | Público, limitado | Cadastro de cliente ou prestador |
-| POST | `/auth/login` | Público, limitado | Login por e-mail ou telefone |
-| POST | `/auth/refresh` | Refresh token, limitado | Rotaciona a sessão |
-| POST | `/auth/logout` | Refresh token, limitado | Revoga a sessão |
-| GET | `/auth/me` | JWT Bearer | Retorna o perfil autenticado |
+## Rotas implementadas
 
-| GET | `/admin/providers/pending` | Admin/super_admin | Lista prestadores aguardando análise |
-| PATCH | `/admin/providers/:id/approve` | Admin/super_admin | Aprova e ativa o cadastro |
-| PATCH | `/admin/providers/:id/reject` | Admin/super_admin | Rejeita e bloqueia o cadastro |
+| Método | Rota | Acesso |
+|---|---|---|
+| POST | `/auth/register` | Público, limitado |
+| POST | `/auth/login` | Público, limitado |
+| POST | `/auth/refresh` | Refresh token, limitado |
+| POST | `/auth/logout` | Refresh token |
+| GET | `/auth/me` | JWT Bearer |
+| GET | `/admin/providers/pending` | admin/super_admin |
+| PATCH | `/admin/providers/:id/approve` | admin/super_admin |
+| PATCH | `/admin/providers/:id/reject` | admin/super_admin |
 
 ## Regras atuais
+- Senhas com Argon2id; nunca armazenar texto puro.
+- Access token JWT de 15 minutos; refresh token aleatório de 30 dias, com somente SHA-256 persistido e rotação por uso.
+- Cadastro público só permite `customer` e `provider`; não permite atribuir papéis administrativos.
+- Cadastro de prestador exige nome e ao menos uma categoria ativa em `serviceCategoryIds`; perfil e conta começam pendentes, sem token até aprovação.
+- Cliente é criado ativo e recebe sessão após cadastro.
+- Guard JWT verifica estado atual da conta; guard de papéis consulta papéis atuais no banco.
+- Limites de requisição são aplicados pelo Throttler; em múltiplas instâncias, substituir/estender por storage compartilhado.
+- Aprovação/rejeição administrativa atualiza perfil/conta e registra auditoria na mesma transação.
 
-- Senhas são derivadas com Argon2id; nunca devem ser armazenadas em texto puro.
-- Access token JWT tem validade de 15 minutos.
-- Refresh token aleatório tem validade de 30 dias; somente seu SHA-256 é persistido.
-- Renovação revoga o token anterior antes de emitir uma nova sessão.
-- Cadastro público só aceita os papéis `customer` e `provider`; nunca aceita papel administrativo.
-- Prestadores são criados como `pending` e não recebem tokens até aprovação/ativação administrativa.
-- Contas bloqueadas ou não ativas não podem autenticar; o guard consulta o status atual da conta.
-- Limitação global configurada em 60 requisições/minuto; cadastro e login em 5/minuto; refresh em 10/minuto.
-- Guards JWT e de papéis estão disponíveis para proteger controladores.
-- A administração de prestadores exige `admin` ou `super_admin`; aprovação/rejeição atualiza o perfil e a conta na mesma transação e grava evento de auditoria.
+## Matriz de papéis
+
+| Papel | Acesso previsto |
+|---|---|
+| customer | Endereços e chamados próprios; decisões de orçamento próprios |
+| provider | Distribuições recebidas, atribuições próprias, orçamento e documentos próprios |
+| support | Futuras rotas de atendimento com escopo mínimo; ainda sem endpoints próprios |
+| finance | Futuras rotas financeiras segregadas; ainda sem endpoints próprios |
+| admin | Aprovação de prestadores/documentos e distribuição de chamados |
+| super_admin | Administração ampliada e inicialização do primeiro administrador |
+
+Não criar autorização apenas escondendo botões na interface. Toda rota privada exige verificação no servidor.
 
 ## Configuração
+Definir em ambiente seguro: `DATABASE_URL`, `JWT_ACCESS_SECRET` com pelo menos 32 caracteres aleatórios e `CORS_ORIGINS` com origens exatas. Nunca versionar `.env`.
 
-Defina em ambiente seguro:
-- `DATABASE_URL`
-- `JWT_ACCESS_SECRET` com pelo menos 32 caracteres aleatórios
-- `CORS_ORIGINS` com a lista exata dos domínios autorizados
-
-Nunca publique o arquivo `.env`, segredos, tokens ou dados reais.
-
-## Banco de dados
-
-Antes de usar autenticação, aplique em ambiente de desenvolvimento, nesta ordem:
-1. `database/001_initial_schema.sql`
-2. `database/002_operations_finance_privacy.sql`
-3. `database/003_auth_sessions.sql`
-
-Não execute migrações em produção sem backup, revisão e plano de rollback.
-
-## Verificação
-
-O workflow GitHub Actions em `.github/workflows/api-check.yml` executa validação do schema Prisma e build da API a cada alteração relevante. A execução precisa terminar com sucesso antes de considerar a compilação validada.
-
-## Pendências antes de produção
-
-- Testes automatizados de cadastro, login, rotação, logout, bloqueio e autorização.
-- Integração e teste com PostgreSQL real de desenvolvimento.
-- Fluxo administrativo auditado para aprovar prestadores e atribuir permissões.
-- Proteção adicional contra abuso distribuído (rate limit compartilhado entre instâncias), monitoramento e alertas.
-- Política de recuperação de senha e verificação de e-mail/telefone.
-- Revisão de segurança independente e configuração de HTTPS/segredos no provedor de hospedagem.
-
+## Banco
+Aplicar migrações SQL 001–006 em ambiente descartável/homologação, conforme `database/README.md`. Não misturar SQL versionado e Prisma Migrate sem plano formal de baseline.
 
 ## Primeiro superadministrador
+O primeiro acesso administrativo é criado pelo script de uso único `npm run admin:create`, com `SUPER_ADMIN_EMAIL` e `SUPER_ADMIN_PASSWORD` injetados pelo secret manager. Não colocar senha em GitHub, chat ou arquivos versionados.
 
-O primeiro acesso administrativo não é criado pelo cadastro público. Para inicializar, em ambiente controlado com o banco configurado, use o script de uso único:
-
-```bash
-SUPER_ADMIN_EMAIL="admin@seudominio.com" SUPER_ADMIN_PASSWORD="uma-senha-aleatoria-com-16-ou-mais-caracteres" npm run admin:create
-```
-
-Use um segredo forte e exclusivo, fornecido por gerenciador de segredos; não coloque a senha no repositório, no histórico do terminal compartilhado ou em arquivos versionados. O script recusa e-mail já cadastrado, cria a conta ativa com papel `super_admin` e registra a operação na auditoria. Proteja a execução e remova as variáveis do ambiente após o uso.
+## Pendências antes de produção
+- Verificação de e-mail/telefone, recuperação de senha e política de sessão web com cookie HttpOnly/Secure.
+- Rate limit distribuído, monitoramento de fraude e revisão de segurança.
+- Política LGPD completa, retenção e consentimentos.
+- Testes ponta a ponta em homologação com PostgreSQL, storage e clientes separados.
