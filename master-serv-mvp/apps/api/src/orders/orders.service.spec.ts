@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,7 +46,7 @@ describe('OrdersService workflow safeguards', () => {
       findFirst: jest.fn().mockResolvedValue(null),
     };
 
-    await expect(service.listProviderDispatches('provider-pending')).rejects.toBeInstanceOf(Error);
+    await expect(service.listProviderDispatches('provider-pending')).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.providerProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ approvalStatus: 'approved' }),
     }));
